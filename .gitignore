@@ -3,6 +3,9 @@
 /node_modules
 /build
 
+# locally stored media uploads
+/uploads
+
 # Logs
 logs
 *.log

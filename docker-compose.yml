@@ -1,0 +1,35 @@
+# Local development infrastructure for Made in Vrancea.
+#
+#   docker compose up -d
+#
+# Starts SQL Server (the local equivalent of Azure SQL Database) and Azurite
+# (the local equivalent of Azure Blob Storage). The application creates the
+# `madeinvrancea` database automatically on first run.
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: madeinvrancea-sql
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_SA_PASSWORD: 'Your_password123'
+      MSSQL_PID: 'Express'
+    ports:
+      - '1433:1433'
+    volumes:
+      - mssql-data:/var/opt/mssql
+
+  # Optional: local Azure Blob Storage emulator. Set
+  # AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true to use it.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: madeinvrancea-azurite
+    command: 'azurite-blob --blobHost 0.0.0.0 --loose'
+    ports:
+      - '10000:10000'
+    volumes:
+      - azurite-data:/data
+
+volumes:
+  mssql-data:
+  azurite-data:

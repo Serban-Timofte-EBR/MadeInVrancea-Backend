@@ -1,235 +1,190 @@
-# Made in Vrancea — Backend (Phase 1)
+# Made in Vrancea
 
-REST API for the **Made in Vrancea** platform: an interactive regional map and
-business directory for the Vrancea county. Built with **NestJS**, **TypeORM**
-and **SQL Server** (Azure SQL in production).
+An interactive regional map and business directory for Vrancea County, Romania.
+The project is split into two apps:
 
-The code follows a **controller → service → model (entity) → DTO** architecture.
-Feature modules: `auth`, `users`, `roles`, `categories`, `businesses`,
-`locations`, `media`, `map`, `logs`.
+| Folder                                               | Stack                                          | Dev URL                   |
+| ---------------------------------------------------- | ---------------------------------------------- | ------------------------- |
+| [`MadeInVrancea-Backend`](./MadeInVrancea-Backend)   | NestJS 11 · TypeORM · SQL Server · JWT         | http://localhost:3000/api |
+| [`MadeInVrancea-Frontend`](./MadeInVrancea-Frontend) | React 19 · Vite · MUI · React Router · Leaflet | http://localhost:5173     |
 
----
-
-## Prerequisites
-
-- **Node.js 20+** and **npm**
-- A database, using either:
-  - **Docker Desktop** (recommended — runs SQL Server locally in one command), or
-  - an existing **SQL Server** / **Azure SQL** instance you can connect to.
+The frontend talks to the backend REST API. In development, Vite proxies
+`/api` and `/uploads` to the backend, so no CORS configuration is needed.
 
 ---
 
-## Quick start (local development)
+## 1. Prerequisites
 
-### 1. Install dependencies
+- **Node.js 20.19+ or 22+** and npm (check with `node -v`)
+- **A SQL Server database** — the easiest option is Docker (see below). A local
+  SQL Server / SQL Server Express instance works too.
+- **Docker Desktop** (optional, only if you use the Docker database option)
 
-```bash
+---
+
+## 2. Start the database (SQL Server)
+
+The backend needs a running SQL Server instance. It will **create the database
+and tables automatically** on first boot — you only need the server running.
+
+### Option A — Docker (recommended)
+
+```powershell
+docker run `
+  -e "ACCEPT_EULA=Y" `
+  -e "MSSQL_SA_PASSWORD=Your_password123" `
+  -p 1433:1433 `
+  --name miv-sqlserver `
+  -d mcr.microsoft.com/mssql/server:2022-latest
+```
+
+- Stop it later with `docker stop miv-sqlserver`, start again with `docker start miv-sqlserver`.
+- The SA password must match `DB_PASSWORD` in the backend `.env` (see next step).
+
+### Option B — Existing SQL Server instance
+
+Make sure it listens on `localhost:1433` and that you have a login (e.g. `sa`)
+with a password. You'll put those values in the backend `.env`.
+
+> You do **not** need to create the `madeinvrancea` database yourself — the
+> backend creates it on startup in development.
+
+---
+
+## 3. Start the backend (API)
+
+```powershell
+cd MadeInVrancea-Backend
 npm install
-```
 
-### 2. Create your environment file
-
-Copy the provided template and adjust values if needed:
-
-```bash
-# macOS / Linux
-cp .env.example .env
-
-# Windows (PowerShell)
+# Create your local environment file from the template
 Copy-Item .env.example .env
-```
 
-The defaults in `.env.example` already match the local Docker database below,
-so it works out of the box.
-
-### 3. Start the database
-
-Using Docker (starts SQL Server on `localhost:1433`, plus an optional Azurite
-blob emulator):
-
-```bash
-docker compose up -d
-```
-
-> Already have SQL Server? Skip Docker and point the `DB_*` variables in `.env`
-> at your instance instead.
-
-### 4. Run the API
-
-```bash
+# Start in watch mode
 npm run start:dev
 ```
 
-On the **first boot** the application automatically:
+On the first run the backend will:
 
-1. creates the `madeinvrancea` database if it does not exist,
-2. creates all tables from the entities (because `DB_SYNCHRONIZE=true`),
-3. seeds the system roles and a **default admin** account.
+1. Create the `madeinvrancea` database if it doesn't exist.
+2. Create all tables from the entities (`DB_SYNCHRONIZE=true`).
+3. Seed roles, a default **admin** account, the **10 categories**, and **17
+   sample Vrancea businesses**.
 
-### 5. Open it
+When it's ready you'll have:
 
-| What                          | URL                               |
-| ----------------------------- | --------------------------------- |
-| API base                      | http://localhost:3000/api         |
-| Swagger UI (interactive docs) | http://localhost:3000/api/docs    |
-| Health check                  | http://localhost:3000/api/health  |
-| Locally stored uploads        | http://localhost:3000/uploads/... |
+- API base URL: **http://localhost:3000/api**
+- Swagger docs: **http://localhost:3000/api/docs**
 
-**Default admin** (from `.env`): `admin@madeinvrancea.ro` / `Admin_password123`.
-Log in with `POST /api/auth/login` to obtain a JWT.
+### Backend environment variables (`.env`)
 
----
+The defaults in `.env.example` match the Docker command above, so it usually
+works without edits. Adjust the database section if your setup differs.
 
-## Authentication
-
-All routes require a JWT **except** those marked as public (auth, health, and
-read-only catalog/map endpoints).
-
-1. Register a business owner: `POST /api/auth/register`
-2. Log in: `POST /api/auth/login` → returns `{ accessToken, user }`
-3. Send the token on protected requests:
-   `Authorization: Bearer <accessToken>`
-4. In Swagger UI, click **Authorize** and paste the token to try endpoints.
-
-Roles: `Admin`, `BusinessOwner`, `Customer`, `Guest`. New registrations become
-`BusinessOwner`; the seeded admin is `Admin`.
+| Variable                              | Default                   | Notes                                             |
+| ------------------------------------- | ------------------------- | ------------------------------------------------- |
+| `PORT`                                | `3000`                    | API port                                          |
+| `JWT_SECRET`                          | `change-me-in-production` | Use a long random value in production             |
+| `JWT_EXPIRES_IN`                      | `7d`                      | Token lifetime                                    |
+| `DB_HOST`                             | `localhost`               | SQL Server host                                   |
+| `DB_PORT`                             | `1433`                    | SQL Server port                                   |
+| `DB_USERNAME`                         | `sa`                      | SQL Server login                                  |
+| `DB_PASSWORD`                         | `Your_password123`        | Must match your SQL Server password               |
+| `DB_NAME`                             | `madeinvrancea`           | Auto-created in development                       |
+| `DB_ENCRYPT` / `DB_TRUST_SERVER_CERT` | `true`                    | Keep both `true` locally                          |
+| `DB_SYNCHRONIZE`                      | `true`                    | Auto-create tables in dev; `false` in prod        |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD`      | see below                 | Seeded admin account                              |
+| `AZURE_STORAGE_CONNECTION_STRING`     | _(empty)_                 | Empty = store uploads on local disk (`./uploads`) |
 
 ---
 
-## Available scripts
+## 4. Start the frontend (web app)
 
-| Command              | Description                           |
-| -------------------- | ------------------------------------- |
-| `npm run start:dev`  | Start in watch mode (development).    |
-| `npm run start`      | Start once.                           |
-| `npm run start:prod` | Run the compiled build (`dist/main`). |
-| `npm run build`      | Compile TypeScript to `dist/`.        |
-| `npm run lint`       | Lint and auto-fix.                    |
-| `npm run format`     | Format with Prettier.                 |
-| `npm run test`       | Unit tests.                           |
-| `npm run test:e2e`   | End-to-end tests.                     |
+Open a **second terminal**:
 
----
-
-## Environment variables
-
-| Variable                          | Default                   | Description                                                      |
-| --------------------------------- | ------------------------- | ---------------------------------------------------------------- |
-| `NODE_ENV`                        | `development`             | `development` or `production`.                                   |
-| `PORT`                            | `3000`                    | HTTP port.                                                       |
-| `JWT_SECRET`                      | `change-me-in-production` | Secret used to sign JWTs. **Change in production.**              |
-| `JWT_EXPIRES_IN`                  | `7d`                      | Token lifetime.                                                  |
-| `DB_HOST`                         | `localhost`               | SQL Server host.                                                 |
-| `DB_PORT`                         | `1433`                    | SQL Server port.                                                 |
-| `DB_USERNAME`                     | `sa`                      | Database user.                                                   |
-| `DB_PASSWORD`                     | `Your_password123`        | Database password.                                               |
-| `DB_NAME`                         | `madeinvrancea`           | Database name (auto-created in dev).                             |
-| `DB_ENCRYPT`                      | `true`                    | Encrypt the connection (required by Azure SQL).                  |
-| `DB_TRUST_SERVER_CERT`            | `true`                    | Trust self-signed certs (local Docker). Set `false` on Azure.    |
-| `DB_SYNCHRONIZE`                  | `true` in dev             | Auto-create schema from entities. **Set `false` in production.** |
-| `ADMIN_EMAIL`                     | `admin@madeinvrancea.ro`  | Seeded admin email.                                              |
-| `ADMIN_PASSWORD`                  | `Admin_password123`       | Seeded admin password.                                           |
-| `AZURE_STORAGE_CONNECTION_STRING` | _(empty)_                 | Empty = store uploads on local disk. See below.                  |
-| `AZURE_STORAGE_CONTAINER`         | `media`                   | Blob container name.                                             |
-| `AZURE_STORAGE_PUBLIC_URL`        | _(empty)_                 | Optional CDN/base URL prefixed to file URLs.                     |
-
----
-
-## Media storage
-
-Uploads (logos, covers, gallery images) are handled by a storage service with
-three modes:
-
-- **Local disk (default):** leave `AZURE_STORAGE_CONNECTION_STRING` empty. Files
-  are saved to `./uploads` and served at `/uploads/...`.
-- **Azurite (local Azure emulator):** set
-  `AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true` (the `docker
-compose` file already starts Azurite).
-- **Azure Blob Storage (production):** paste the storage account connection
-  string.
-
----
-
-## API overview
-
-All paths are prefixed with `/api`. Explore and try them in Swagger at
-`/api/docs`.
-
-| Module                           | Endpoints                                                                                                                                                     |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Health**                       | `GET /` · `GET /health`                                                                                                                                       |
-| **Auth**                         | `POST /auth/register` · `POST /auth/login` · `GET /auth/me`                                                                                                   |
-| **Users** _(admin)_              | `GET /users` · `GET /users/:id` · `PATCH /users/:id` · `PATCH /users/:id/suspend` · `PATCH /users/:id/activate` · `DELETE /users/:id`                         |
-| **Roles** _(admin)_              | `GET/POST /roles` · `GET/PATCH/DELETE /roles/:id`                                                                                                             |
-| **Categories**                   | `GET /categories` (`?tree=true`) · `GET /categories/slug/:slug` · `GET /categories/:id` · _(admin)_ `POST/PATCH/DELETE`                                       |
-| **Businesses**                   | `GET /businesses` (search + pagination) · `GET /businesses/slug/:slug` · `GET /businesses/:id`                                                                |
-| **Businesses** _(owner)_         | `GET /businesses/me/list` · `GET /businesses/me/:id` · `POST /businesses` · `PATCH /businesses/:id` · `DELETE /businesses/:id`                                |
-| **Businesses** _(admin vetting)_ | `GET /businesses/admin/pending` · `PATCH /businesses/:id/approve` · `PATCH /businesses/:id/reject` · `PATCH /businesses/:id/suspend`                          |
-| **Locations**                    | `GET /businesses/:businessId/locations` · `POST /businesses/:businessId/locations` · `PATCH/DELETE /locations/:id` · `GET/PUT /locations/:id/operating-hours` |
-| **Media**                        | `GET /businesses/:businessId/media` · `POST /businesses/:businessId/media` (multipart) · `DELETE /media/:id`                                                  |
-| **Map**                          | `GET /map/pins` (viewport + category filter)                                                                                                                  |
-| **Logs / Analytics**             | `POST /logs` · `GET /businesses/:businessId/analytics`                                                                                                        |
-
----
-
-## Project structure
-
-```
-src/
-  common/            # enums, decorators, guards, transformers, utils
-  config/            # configuration + TypeORM connection factory
-  database/          # DB bootstrap (auto-create) + role/admin seeder
-  modules/
-    auth/            # register/login, JWT strategy, guards
-    users/
-    roles/
-    categories/
-    businesses/
-    locations/       # locations + operating hours
-    media/           # uploads + blob/local storage
-    map/             # geospatial pins for the interactive map
-    logs/            # visitor traffic + business analytics
-  app.module.ts
-  main.ts
+```powershell
+cd MadeInVrancea-Frontend
+npm install
+npm run dev
 ```
 
-Each feature module keeps the same layout:
-`*.controller.ts` · `*.service.ts` · `*.module.ts` · `entities/` · `dto/`.
+Then open **http://localhost:5173**.
+
+The API base URL is preconfigured in `MadeInVrancea-Frontend/.env`
+(`VITE_API_URL=/api`) and Vite proxies requests to `http://localhost:3000`, so
+the two apps work together with no extra setup.
 
 ---
 
-## Production & Azure deployment (low cost)
+## 5. Default logins (seeded)
 
-Target budget: **~$5/month for the database**, well within the €15 range.
+| Role           | Email                    | Password            |
+| -------------- | ------------------------ | ------------------- |
+| Administrator  | `admin@madeinvrancea.ro` | `Admin_password123` |
+| Business owner | `owner@madeinvrancea.ro` | `Owner_password123` |
 
-| Concern     | Azure service                       | Notes                                             |
-| ----------- | ----------------------------------- | ------------------------------------------------- |
-| Database    | **Azure SQL Database — Basic tier** | ~5 USD/month, 2 GB. Same `mssql` driver as local. |
-| API hosting | **Azure App Service** (Linux, Node) | Deploy via GitHub Actions.                        |
-| Media       | **Azure Blob Storage**              | A few cents/month.                                |
+- Admins land on the admin panel (`/admin`) — vetting queue, users, categories.
+- Business owners land on the merchant dashboard (`/cont`).
+- Visitors can browse the map, directory, and business profiles without a login.
 
-Production checklist:
-
-1. Set `NODE_ENV=production`.
-2. Set `DB_SYNCHRONIZE=false` and manage schema changes with migrations.
-3. Use a strong random `JWT_SECRET`.
-4. Set the real `DB_*` values from Azure SQL and `DB_TRUST_SERVER_CERT=false`.
-5. Set `AZURE_STORAGE_CONNECTION_STRING` to the storage account.
-6. Build and run:
-
-   ```bash
-   npm run build
-   npm run start:prod
-   ```
+> You can also register a brand-new business-owner account from the
+> **Adaugă afacerea** button in the header.
 
 ---
 
-## Troubleshooting
+## 6. Quick start (TL;DR)
 
-- **Cannot connect to the database / login failed for user 'sa':** ensure the
-  container is up (`docker compose ps`) and that `DB_PASSWORD` matches
-  `MSSQL_SA_PASSWORD` in `docker-compose.yml`.
-- **Port 1433 already in use:** stop the other SQL Server instance or change
-  `DB_PORT` and the compose port mapping.
-- **Uploads not persisted:** with local disk mode, files live in `./uploads`
-  (git-ignored). Configure Azure Blob Storage for durable storage.
+```powershell
+# 1. Database (Docker)
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Your_password123" -p 1433:1433 --name miv-sqlserver -d mcr.microsoft.com/mssql/server:2022-latest
+
+# 2. Backend (terminal 1)
+cd MadeInVrancea-Backend; npm install; Copy-Item .env.example .env; npm run start:dev
+
+# 3. Frontend (terminal 2)
+cd MadeInVrancea-Frontend; npm install; npm run dev
+```
+
+Open http://localhost:5173.
+
+---
+
+## 7. Useful commands
+
+**Backend**
+
+| Command              | Description                             |
+| -------------------- | --------------------------------------- |
+| `npm run start:dev`  | Start API in watch mode                 |
+| `npm run build`      | Compile to `dist/`                      |
+| `npm run start:prod` | Run the compiled app (`node dist/main`) |
+| `npm run lint`       | Lint (with `--fix`)                     |
+| `npm test`           | Unit tests                              |
+
+**Frontend**
+
+| Command           | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `npm run dev`     | Start Vite dev server (http://localhost:5173) |
+| `npm run build`   | Type-check and build to `dist/`               |
+| `npm run preview` | Preview the production build                  |
+| `npm run lint`    | Lint                                          |
+
+---
+
+## 8. Troubleshooting
+
+- **Backend can't connect to the database** — make sure SQL Server is running
+  and that `DB_HOST`, `DB_PORT`, `DB_USERNAME`, and `DB_PASSWORD` in the backend
+  `.env` match your instance. With Docker, confirm the container is up:
+  `docker ps`.
+- **`Login failed for user 'sa'`** — the `.env` `DB_PASSWORD` must equal the
+  `MSSQL_SA_PASSWORD` you used when creating the container.
+- **Frontend loads but shows errors / empty data** — the backend must be
+  running on port `3000`. Start it before (or alongside) the frontend.
+- **Port already in use** — change `PORT` in the backend `.env`, or stop the
+  process using the port. If you change the backend port, update the proxy
+  target in `MadeInVrancea-Frontend/vite.config.ts`.
+- **Reset the sample data** — drop the `madeinvrancea` database (or remove the
+  Docker container with `docker rm -f miv-sqlserver`) and restart the backend;
+  it will recreate and reseed everything.

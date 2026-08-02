@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsRelations, In, Repository } from 'typeorm';
+import { FindOptionsRelations, In, Not, Repository } from 'typeorm';
 import { BusinessStatus } from '../../common/enums/business-status.enum';
+import { RoleName } from '../../common/enums/role-name.enum';
 import { assertOwnerOrAdmin } from '../../common/utils/ownership';
 import { slugify } from '../../common/utils/slugify';
 import { Category } from '../categories/entities/category.entity';
@@ -34,12 +39,13 @@ export class BusinessesService {
     private readonly categoryRepository: Repository<Category>,
   ) {}
 
-  async create(ownerId: string, dto: CreateBusinessDto): Promise<Business> {
+  async create(user: User, dto: CreateBusinessDto): Promise<Business> {
+    await this.assertUniqueIdentity(dto.name, dto.taxId ?? null);
     const slug = await this.generateUniqueSlug(dto.name);
     const categories = await this.resolveCategories(dto.categoryIds);
 
     const business = this.businessRepository.create({
-      ownerId,
+      ownerId: user.userId,
       name: dto.name,
       slug,
       description: dto.description ?? null,
@@ -48,7 +54,10 @@ export class BusinessesService {
       contactEmail: dto.contactEmail ?? null,
       websiteURL: dto.websiteURL ?? null,
       socialLinks: dto.socialLinks ?? null,
-      status: BusinessStatus.PENDING,
+      status:
+        user.role.name === RoleName.ADMIN
+          ? BusinessStatus.ACTIVE
+          : BusinessStatus.PENDING,
       categories,
       locations: dto.location
         ? [
@@ -71,7 +80,7 @@ export class BusinessesService {
         : [],
     });
 
-    const saved = await this.businessRepository.save(business);
+    const saved = await this.saveWithUniqueConflict(business);
     return this.findById(saved.businessId);
   }
 
@@ -182,6 +191,10 @@ export class BusinessesService {
   ): Promise<Business> {
     const business = await this.findById(id);
     assertOwnerOrAdmin(business.ownerId, user);
+    const nextName = dto.name ?? business.name;
+    const nextTaxId =
+      dto.taxId !== undefined ? (dto.taxId ?? null) : business.taxId;
+    await this.assertUniqueIdentity(nextName, nextTaxId, id);
 
     if (dto.name && dto.name !== business.name) {
       business.name = dto.name;
@@ -202,7 +215,7 @@ export class BusinessesService {
     if (dto.categoryIds)
       business.categories = await this.resolveCategories(dto.categoryIds);
 
-    await this.businessRepository.save(business);
+    await this.saveWithUniqueConflict(business);
     return this.findById(id);
   }
 
@@ -213,6 +226,13 @@ export class BusinessesService {
   }
 
   // ----- Admin vetting -----
+
+  findAllForAdmin(): Promise<Business[]> {
+    return this.businessRepository.find({
+      relations: FULL_RELATIONS,
+      order: { createdAt: 'DESC' },
+    });
+  }
 
   findPending(): Promise<Business[]> {
     return this.businessRepository.find({
@@ -254,6 +274,48 @@ export class BusinessesService {
       throw new NotFoundException(`Business ${id} not found`);
     }
     return business;
+  }
+
+  private async assertUniqueIdentity(
+    name: string,
+    taxId: string | null,
+    excludeId?: string,
+  ): Promise<void> {
+    const businessId = excludeId ? Not(excludeId) : undefined;
+    const nameConflict = await this.businessRepository.findOne({
+      where: { name, ...(businessId && { businessId }) },
+      select: { businessId: true },
+    });
+    if (nameConflict) {
+      throw new ConflictException('Există deja o afacere cu această denumire.');
+    }
+
+    if (taxId) {
+      const taxIdConflict = await this.businessRepository.findOne({
+        where: { taxId, ...(businessId && { businessId }) },
+        select: { businessId: true },
+      });
+      if (taxIdConflict) {
+        throw new ConflictException('Există deja o afacere cu acest CUI/CIF.');
+      }
+    }
+  }
+
+  private async saveWithUniqueConflict(business: Business): Promise<Business> {
+    try {
+      return await this.businessRepository.save(business);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('UQ_businesses_name')) {
+        throw new ConflictException(
+          'Există deja o afacere cu această denumire.',
+        );
+      }
+      if (message.includes('UQ_businesses_taxId')) {
+        throw new ConflictException('Există deja o afacere cu acest CUI/CIF.');
+      }
+      throw error;
+    }
   }
 
   private async resolveCategories(ids: string[]): Promise<Category[]> {

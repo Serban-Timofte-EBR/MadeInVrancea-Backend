@@ -21,7 +21,7 @@ export class Location {
   @JoinColumn({ name: 'businessId' })
   business: Business;
 
-  @Column()
+  @Column({ type: 'uniqueidentifier' })
   businessId: string;
 
   @Column()

@@ -49,6 +49,14 @@ export class BusinessesController {
     return this.businessesService.findPending();
   }
 
+  @Get('admin/all')
+  @ApiBearerAuth()
+  @Roles(RoleName.ADMIN)
+  @ApiOperation({ summary: 'List all businesses and statuses (admin only)' })
+  findAllForAdmin() {
+    return this.businessesService.findAllForAdmin();
+  }
+
   @Public()
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get an active business profile by SEO slug' })
@@ -80,10 +88,11 @@ export class BusinessesController {
   @ApiBearerAuth()
   @Roles(RoleName.BUSINESS_OWNER, RoleName.ADMIN)
   @ApiOperation({
-    summary: 'Create a business (onboarding). Starts in Pending status.',
+    summary:
+      'Create a business. Admin submissions are Active; owner submissions are Pending.',
   })
   create(@CurrentUser() user: User, @Body() dto: CreateBusinessDto) {
-    return this.businessesService.create(user.userId, dto);
+    return this.businessesService.create(user, dto);
   }
 
   @Patch(':id')

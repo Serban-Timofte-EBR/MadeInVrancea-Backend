@@ -20,7 +20,7 @@ export class MediaAsset {
   @JoinColumn({ name: 'businessId' })
   business: Business;
 
-  @Column()
+  @Column({ type: 'uniqueidentifier' })
   businessId: string;
 
   @Column({ type: 'varchar', length: 20 })
@@ -31,7 +31,7 @@ export class MediaAsset {
   fileURL: string;
 
   /** Blob name inside the storage container, used for deletion. */
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   blobName: string | null;
 
   @CreateDateColumn()

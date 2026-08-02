@@ -18,7 +18,7 @@ export class OperatingHour {
   @JoinColumn({ name: 'locationId' })
   location: Location;
 
-  @Column()
+  @Column({ type: 'uniqueidentifier' })
   locationId: string;
 
   /** 1 = Monday ... 7 = Sunday. */

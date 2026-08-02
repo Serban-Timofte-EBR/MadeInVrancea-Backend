@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -8,14 +8,20 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { CreateLocationDto } from '../../locations/dto/create-location.dto';
 
 export class CreateBusinessDto {
   @ApiProperty({ example: 'Crama Gîrboiu' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value,
+  )
   @IsString()
+  @MinLength(2)
   @MaxLength(200)
   name: string;
 
@@ -32,7 +38,19 @@ export class CreateBusinessDto {
     example: 'RO1234567',
   })
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value
+          .trim()
+          .toUpperCase()
+          .replace(/[\s.-]/g, '')
+          .replace(/^RO(?=\d)/, '')
+      : value,
+  )
   @IsString()
+  @Matches(/^\d{2,10}$/, {
+    message: 'CUI / CIF must contain between 2 and 10 digits',
+  })
   @MaxLength(50)
   taxId?: string;
 
@@ -70,7 +88,7 @@ export class CreateBusinessDto {
   })
   @IsArray()
   @ArrayNotEmpty()
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   categoryIds: string[];
 
   @ApiPropertyOptional({

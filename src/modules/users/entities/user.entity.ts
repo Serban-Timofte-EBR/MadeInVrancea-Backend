@@ -20,7 +20,7 @@ export class User {
   @JoinColumn({ name: 'roleId' })
   role: Role;
 
-  @Column()
+  @Column({ type: 'uniqueidentifier' })
   roleId: string;
 
   @Column({ unique: true })

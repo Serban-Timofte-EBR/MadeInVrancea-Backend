@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   JoinTable,
   ManyToMany,
@@ -17,6 +18,11 @@ import { MediaAsset } from '../../media/entities/media-asset.entity';
 import { User } from '../../users/entities/user.entity';
 
 @Entity('businesses')
+@Index('UQ_businesses_name', ['name'], { unique: true })
+@Index('UQ_businesses_taxId', ['taxId'], {
+  unique: true,
+  where: '[taxId] IS NOT NULL',
+})
 export class Business {
   @PrimaryGeneratedColumn('uuid')
   businessId: string;
@@ -25,7 +31,7 @@ export class Business {
   @JoinColumn({ name: 'ownerId' })
   owner: User;
 
-  @Column()
+  @Column({ type: 'uniqueidentifier' })
   ownerId: string;
 
   @Column()
@@ -38,16 +44,16 @@ export class Business {
   @Column({ type: 'nvarchar', length: 'MAX', nullable: true })
   description: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   taxId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   contactPhone: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   contactEmail: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   websiteURL: string | null;
 
   /** Social media links, e.g. { "facebook": "...", "instagram": "..." }. */

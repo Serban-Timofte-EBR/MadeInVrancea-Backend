@@ -16,12 +16,12 @@ export class Category {
 
   @ManyToOne(() => Category, (category) => category.children, {
     nullable: true,
-    onDelete: 'SET NULL',
+    onDelete: 'NO ACTION',
   })
   @JoinColumn({ name: 'parentId' })
   parent: Category | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uniqueidentifier', nullable: true })
   parentId: string | null;
 
   @OneToMany(() => Category, (category) => category.parent)
@@ -34,7 +34,7 @@ export class Category {
   slug: string;
 
   /** URL of the custom pin icon shown on the map for this category. */
-  @Column({ nullable: true })
+  @Column({ type: 'nvarchar', nullable: true })
   iconURL: string | null;
 
   @ManyToMany(() => Business, (business) => business.categories)
